@@ -1,5 +1,5 @@
 import { atom, memberOf, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
 import type { Critical, Whisper, WhisperKind, WhisperStats } from '../types'
 import { classify } from './classify'
@@ -34,6 +34,61 @@ const REPEAT_MS = 60_000
 // Texts toasted recently, so a message tied to no tool call is toasted once a
 // minute. A module variable: a reload resets it, which only re-shows a toast.
 const lastToasted = new Map<string, number>()
+
+// ---- pane placement: the gsd-status-mod setup (a docked pane, `openOnStart`),
+// off by default here since the history is empty until a hook speaks. The pane
+// opens unasked only where Claude Code's fullscreen layout docks it as a
+// sidebar (`/tui fullscreen`), and says why when it waits: an Orca split is
+// often under the 144 columns an unasked pane needs (110 once opened by hand).
+
+const PANE_SIZE = { columns: 64, rows: 16 }
+const LAYOUT_KEY = 'fullscreen'
+const HINTED_KEY = 'hinted-main-screen'
+
+let openOnStart = false
+let fullscreen: boolean | undefined // as a render or command last reported it; fixed per session
+let autoTried = false
+let closedByHand = false
+const openRows = new Set<string>() // history rows the person opened with their ▸
+
+function rowId(w: Whisper): string {
+  return `${w.at}|${w.event}|${w.rule}|${w.toolUseId ?? ''}`
+}
+
+export const MAIN_SCREEN_HINT =
+  'Claude Code is on its main-screen layout, so the pane sits above the prompt. Run /tui fullscreen to dock it on the right (Orca included).'
+
+export function waitingHint(reason: string): string {
+  return `GSD whispers pane is waiting: ${reason.replace(/\.?\s*$/, '.')} Run /gsd-whisper to open it now.`
+}
+
+function noteLayout(v: { isFullscreen?: boolean } | undefined): void {
+  if (typeof v?.isFullscreen === 'boolean') fullscreen = v.isFullscreen
+}
+
+async function keepLayout($: EngineInterface): Promise<void> {
+  if (fullscreen !== undefined && (await $.store.get(LAYOUT_KEY)) !== fullscreen) await $.store.set(LAYOUT_KEY, fullscreen)
+}
+
+// The unasked open, tried once per session as soon as the layout is known, and
+// only in a GSD project (a .planning/STATE.md where the session started).
+async function autoOpen($: EngineInterface): Promise<void> {
+  if (autoTried || closedByHand || !openOnStart) return
+  if (!(await $.fs.exists(`${await $.session.cwd()}/.planning/STATE.md`))) return
+  const stored = await $.store.get(LAYOUT_KEY)
+  const layout = fullscreen ?? (typeof stored === 'boolean' ? stored : undefined)
+  if (layout === undefined) return
+  autoTried = true
+  if (!layout) {
+    if ((await $.store.get(HINTED_KEY)) !== true) {
+      await $.store.set(HINTED_KEY, true)
+      $.ui.toast(`gsd-whisper: ${MAIN_SCREEN_HINT}`)
+    }
+    return
+  }
+  const opened = await $.ui.open({ id: PANE, title: 'GSD whispers', ...PANE_SIZE })
+  if (!opened.isPlaced) $.ui.toast(waitingHint(opened.reason))
+}
 
 type Seen = { kind: WhisperKind; text: string }
 
@@ -211,7 +266,8 @@ function report(list: Whisper[], s: WhisperStats): string {
   return lines.join('\n')
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  openOnStart = options.openOnStart === true
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'gsd-whisper',
@@ -225,8 +281,26 @@ export const register: Register = on => {
       description:
         'Read-only. Returns what gsd-core hooks told the agent this session, as seen by the gsd-whisper mod, with per-event counts.',
     })
+    if (e.isInteractive) void autoOpen($).catch(() => undefined)
     return next(e)
   })
+
+  // The first turn settles the layout a first-ever session did not know.
+  on('turn.complete', async ($, e, next) => {
+    const result = await next(e)
+    if (e.agentId === undefined) {
+      void autoOpen($).catch(() => undefined)
+      void keepLayout($).catch(() => undefined)
+    }
+    return result
+  })
+
+  // Closed with its close mark (or ctrl+x x): not reopened unasked this session.
+  on('ui.close', { id: PANE }, async ($, e, next) => {
+    const result = await next(e)
+    if (e.origin.kind === 'person') closedByHand = true
+    return result
+  }).catch(($, e, next) => next(e))
 
   on('tool.call', { tool: 'mcp__gsd-whisper__report' }, async $ => {
     return { result: report(await read($, whispers), await read($, stats)) }
@@ -237,8 +311,13 @@ export const register: Register = on => {
       await update($, whispers, () => [])
       return { text: 'Cleared the GSD whispers history.' }
     }
-    const opened = await $.ui.open({ id: PANE, title: 'GSD whispers' })
-    if (opened.isPlaced) return { text: 'Opened the GSD whispers pane.' }
+    noteLayout(e.presentation)
+    closedByHand = false
+    const opened = await $.ui.open({ id: PANE, title: 'GSD whispers', ...PANE_SIZE })
+    await keepLayout($).catch(() => undefined)
+    if (opened.isPlaced) {
+      return { text: `Opened the GSD whispers pane.${e.presentation?.isFullscreen === false ? ` ${MAIN_SCREEN_HINT}` : ''}` }
+    }
     return { text: report(await read($, whispers), await read($, stats)) }
   })
 
@@ -329,49 +408,99 @@ export const register: Register = on => {
     )
   })
 
-  // The session's history.
+  // The session's history, drawn as gsd-status-mod draws its pane: a centred
+  // header, then one round-bordered panel per topic, title left, note right.
+  // A row's ▸ opens its whole message; the rest stay one line each.
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Button, Text } = $.ui.resolve(e)
+    noteLayout(e.viewport)
+    const W = Math.max(40, e.props.bodyColumns)
     const list = await read($, whispers)
     const now = await $.clock.now()
-    const room = Math.max(2, Math.floor(((e.viewport?.rows ?? 24) - 6) / 4))
+    const room = Math.max(3, Math.floor((e.props.scroll.bodyRows - 9) / 2))
     const counts = { block: 0, ask: 0, advice: 0 }
     for (const w of list) counts[w.kind] += 1
-    return (
-      <Box flexDirection="column">
-        <Box>
-          <Text color="error">{`${counts.block} blocked  `}</Text>
-          <Text color="warning">{`${counts.ask} asked  `}</Text>
-          <Text color="suggestion">{`${counts.advice} advised`}</Text>
+    const worst: WhisperKind | null = counts.block > 0 ? 'block' : counts.ask > 0 ? 'ask' : counts.advice > 0 ? 'advice' : null
+    const panel = (key: string, color: string, title: string, right: RenderChildren, children: RenderChildren[]) => (
+      <Box key={key} flexDirection="column" borderStyle="round" borderColor={color} paddingX={1} width={W}>
+        <Box justifyContent="space-between">
+          <Text bold wrap="truncate">
+            {title}
+          </Text>
+          {right}
         </Box>
-        <Text color="subtle">What gsd-core's hooks told the agent, newest first.</Text>
-        <Text> </Text>
-        {list.length === 0 && <Text color="subtle">Nothing yet this session.</Text>}
-        {list
-          .slice(-room)
-          .reverse()
-          .map((w, i) => (
-            <Box
-              key={`row-${i}`}
-              flexDirection="column"
-              paddingX={1}
-              borderStyle="round"
-              borderColor={colorOf(w.kind)}
-              backgroundColor={CARD_BG}
-            >
-              {cardLines(
-                { Box, Text },
-                w,
-                0,
-                `${w.tool ? `  ${w.tool}` : ''}${w.isSubagent ? ' (subagent)' : ''}  ${ago(now, w.at)} ago`,
-                false,
-              )}
-            </Box>
-          ))}
-        <Text> </Text>
-        <Box>
-          <Button key="clear" label="Clear" hotkey="c" onPress={() => update($, whispers, () => [])} />
-          <Text color="subtle">{'  or /gsd-whisper clear (keys reach the pane after ctrl+x, tab)'}</Text>
+        {children}
+      </Box>
+    )
+    const shown = list.slice(-room).reverse()
+    return (
+      <Box flexDirection="column" width={W}>
+        <Box justifyContent="center">
+          <Text bold>
+            <Text color="claude">GSD</Text> whispers
+          </Text>
+        </Box>
+        {panel(
+          'counts',
+          worst ? colorOf(worst) : 'subtle',
+          'this session',
+          <Text color="subtle">{`${list.length} in all`}</Text>,
+          [
+            <Box key="tally">
+              <Text color="error">{`${counts.block} blocked  `}</Text>
+              <Text color="warning">{`${counts.ask} asked  `}</Text>
+              <Text color="suggestion">{`${counts.advice} advised`}</Text>
+            </Box>,
+            <Text key="what" color="subtle" wrap="truncate-end">
+              What gsd-core's hooks told the agent.
+            </Text>,
+          ],
+        )}
+        {panel(
+          'history',
+          'claude',
+          'newest first',
+          list.length > shown.length ? <Text color="subtle">{`${shown.length} of ${list.length}`}</Text> : null,
+          [
+            list.length === 0 ? (
+              <Text key="none" color="subtle">
+                Nothing yet this session.
+              </Text>
+            ) : null,
+            ...shown.map((w, i) => {
+              const id = rowId(w)
+              const isOpen = openRows.has(id)
+              return (
+                <Box key={`row-${i}`} flexDirection="column">
+                  <Box>
+                    <Button
+                      key={`open-${i}`}
+                      label={isOpen ? '▾' : '▸'}
+                      plain
+                      onPress={() => {
+                        if (!openRows.delete(id)) openRows.add(id)
+                        $.ui.invalidate('ui.render')
+                      }}
+                    />
+                    <Text color={colorOf(w.kind)} inverse>{` ${labelOf(w.kind)} `}</Text>
+                    <Text bold wrap="truncate">{` ${w.rule}`}</Text>
+                    <Text color="subtle" wrap="truncate">
+                      {`${w.tool ? `  ${w.tool}` : ''}${w.isSubagent ? ' (subagent)' : ''}  ${ago(now, w.at)} ago`}
+                    </Text>
+                  </Box>
+                  <Box paddingLeft={2}>
+                    <Text wrap={isOpen ? 'wrap' : 'truncate-end'}>{w.summary}</Text>
+                  </Box>
+                </Box>
+              )
+            }),
+          ],
+        )}
+        <Box key="footer">
+          <Button key="clear" label="clear" plain hotkey="c" onPress={() => update($, whispers, () => [])} />
+          <Text color="subtle" wrap="truncate">
+            {'  or /gsd-whisper clear; keys after ctrl+x, tab'}
+          </Text>
         </Box>
       </Box>
     )
@@ -379,6 +508,7 @@ export const register: Register = on => {
 
   // At CRITICAL the agent is told to stop; offer the person the matching move.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    noteLayout(e.viewport)
     const c = await read($, critical)
     if (c === null) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)

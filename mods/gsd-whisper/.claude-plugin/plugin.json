@@ -1,6 +1,14 @@
 {
   "name": "gsd-whisper",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Shows you what gsd-core's hooks quietly tell the agent: context warnings, guard advice and guard denials.",
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "openOnStart": {
+      "title": "Open the pane on start",
+      "description": "Dock the GSD whispers pane when a session starts in a GSD project (fullscreen layout only). Off by default: the history is empty until a hook speaks. /gsd-whisper opens it either way.",
+      "type": "boolean",
+      "default": false
+    }
+  }
 }

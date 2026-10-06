@@ -228,7 +228,7 @@ export const register: Register = (on, options) => {
       argumentHint: 'phase <N> | plan <NN-MM>',
     })
     // Read first: the pane opens unasked only in a GSD project.
-    if (e.isInteractive) void refresh($).then(() => autoOpen($))
+    if (e.isInteractive) void refresh($).then(() => autoOpen($)).catch(() => undefined)
     else void refresh($)
     return next(e)
   })
@@ -238,9 +238,9 @@ export const register: Register = (on, options) => {
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
     if (e.agentId === undefined) {
-      if ((await $.clock.now()) - lastRefresh > 2_000) void refresh($).then(() => autoOpen($))
-      else void autoOpen($)
-      void keepLayout($)
+      if ((await $.clock.now()) - lastRefresh > 2_000) void refresh($).then(() => autoOpen($)).catch(() => undefined)
+      else void autoOpen($).catch(() => undefined)
+      void keepLayout($).catch(() => undefined)
     }
     return result
   })
@@ -250,7 +250,7 @@ export const register: Register = (on, options) => {
     closedByHand = false
     await refresh($)
     const opened = await $.ui.open({ id: PANE, title: 'GSD pilot', ...PANE_SIZE })
-    void keepLayout($)
+    await keepLayout($).catch(() => undefined)
     if (opened.isPlaced) return { text: `Opened the GSD pilot.${e.presentation?.isFullscreen === false ? ` ${MAIN_SCREEN_HINT}` : ''}` }
     return { text: asText(await read($, snapshot), await read($, status)) }
   })

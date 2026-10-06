@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
 import { classify } from '../hooks/classify'
+import { MAIN_SCREEN_HINT, waitingHint } from '../hooks/register'
 
 // Texts copied from gsd-core/hooks on `next` (2026-10-06).
 const WARNING =
@@ -216,5 +217,86 @@ describe('register', () => {
     expect(await group.find({ type: 'Text', text: / BLOCKED / })).toBeDefined()
     expect(await group.find({ type: 'Text', text: /\+1 more/ })).toBeDefined()
     await group.unmount()
+  })
+})
+
+// The pane setup taken from gsd-status-mod: when it opens unasked, and what it
+// says when it cannot.
+declare const setTimeout: (fn: () => void, ms: number) => unknown
+const settle = () => new Promise<void>(resolve => setTimeout(resolve, 150))
+
+function placing(on: On, opts: { layout?: boolean; placed?: boolean; isGsd?: boolean } = {}) {
+  const opened: Array<{ columns?: number; rows?: number }> = []
+  const toasts: string[] = []
+  const store = new Map<string, unknown>()
+  if (opts.layout !== undefined) store.set('fullscreen', opts.layout)
+  on('ui.open', ($, e) => {
+    opened.push({ columns: e.columns, rows: e.rows })
+    return { value: opts.placed === false ? { isPlaced: false, reason: 'opened unasked below 144 columns (now 96).' } : { isPlaced: true } } as never
+  })
+  on('ui.toast', ($, e) => {
+    toasts.push(e.text)
+    return { value: undefined } as never
+  })
+  on('store.get', ($, e) => ({ value: store.get(e.key) }) as never)
+  on('store.set', ($, e) => {
+    store.set(e.key, e.value)
+    return { value: undefined } as never
+  })
+  on('session.cwd', () => ({ value: '/work' }) as never)
+  on('fs.exists', ($, e) => ({ value: opts.isGsd !== false && e.path === '/work/.planning/STATE.md' }) as never)
+  on('command.register', ($, e) => ({ value: { command: e.name } }))
+  on('tool.register', ($, e) => ({ value: { tool: `mcp__gsd-whisper__${e.name}` } }))
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  return { opened, toasts, store }
+}
+
+describe('pane placement', () => {
+  test('off by default: a fullscreen GSD session opens nothing unasked', async ($, on) => {
+    const { opened } = placing(on, { layout: true })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([])
+  })
+
+  test('openOnStart on: docks at the gsd-status-mod size', { options: { openOnStart: true } }, async ($, on) => {
+    const { opened } = placing(on, { layout: true })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([{ columns: 64, rows: 16 }])
+  })
+
+  test('openOnStart on, not a GSD project: nothing opens', { options: { openOnStart: true } }, async ($, on) => {
+    const { opened } = placing(on, { layout: true, isGsd: false })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([])
+  })
+
+  test('openOnStart on, main screen: a one-time hint instead of an inline pane', { options: { openOnStart: true } }, async ($, on) => {
+    const { opened, toasts, store } = placing(on, { layout: false })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([])
+    expect(toasts).toEqual([`gsd-whisper: ${MAIN_SCREEN_HINT}`])
+    expect(store.get('hinted-main-screen')).toBe(true)
+  })
+
+  test('openOnStart on, narrow Orca split: says why it waits', { options: { openOnStart: true } }, async ($, on) => {
+    const { toasts } = placing(on, { layout: true, placed: false })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(toasts).toEqual([waitingHint('opened unasked below 144 columns (now 96).')])
+  })
+
+  test('/gsd-whisper on the main screen says how to dock it', async ($, on) => {
+    placing(on)
+    const { text } = await $.command.run({
+      command: 'gsd-whisper',
+      args: '',
+      origin: { kind: 'composer' },
+      presentation: { isFullscreen: false, columns: 96 },
+    } as never)
+    expect(text).toContain('/tui fullscreen')
   })
 })
