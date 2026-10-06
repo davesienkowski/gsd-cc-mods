@@ -53,9 +53,28 @@ hot reload enabled. gsd-core hooks installed through `~/.claude/settings.json`
    gap was hit (the gap gsd-status-mod reported was about passing `$` to a
    const arrow function; this mod passes `$` only to function declarations).
 
+## Round 2 (v0.2.0, UI)
+
+- **Plugin command hooks are visible too.** The mod recorded a `classic.Stop`
+  block from a command hook shipped inside another plugin
+  (`${CLAUDE_PLUGIN_ROOT}/scripts/stop-evidence.mjs`), and PreToolUse advice
+  from settings hooks. This is strong evidence for the open half of S1
+  (gsd-core installed as a plugin), not a test of gsd-core itself.
+- **FileChanged carries no additionalContext in the 2.1.291 types.**
+  `ClassicResultFields` lists no `additionalContext` for `FileChanged`, so
+  gsd-core's `gsd-config-reload.js` (which answers FileChanged with
+  `additionalContext`) may never reach the agent on this Claude Code version.
+  Source: the types only; not observed live. Worth a live check before any
+  upstream report.
+- `$.ui.log` lines were replaced by a badge under the tool row, drawn by
+  wrapping the engine's own `ToolUse` / `ToolGroup` drawing
+  (`<Box>{await next(e)}...</Box>`), with per-call state in a `StateFamily`
+  keyed by `tool_use_id` (written through `memberOf(byCall, { requestId })`),
+  so a new message redraws only its own row.
+
 ## Not yet checked
 
-- S3: how the `$.ui.log` dim line and the CRITICAL band look on screen, and
+- S3: how the badge, pane and CRITICAL band look on screen, and
   next to gsd-status-mod (needs the person's eyes; the agent cannot see the
   screen).
 - The context-monitor path end to end (needs a session near its threshold).

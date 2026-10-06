@@ -8,6 +8,7 @@ export type Whisper = {
   kind: WhisperKind
   summary: string
   tool?: string
+  toolUseId?: string
   isSubagent: boolean
 }
 
@@ -26,6 +27,7 @@ declare module 'claude-code' {
       whispers: Whisper[]
       stats: WhisperStats
       critical: Critical | null
+      byCall: StateFamily<Whisper[]>
     }
   }
 }

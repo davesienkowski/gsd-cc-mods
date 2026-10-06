@@ -6,21 +6,26 @@ workflow advice, `.planning` edit reminders, and guard denials (secret reads,
 worktree paths, catastrophic STATE/ROADMAP shrinks, commit format, agent
 isolation).
 
-Status: **v0.1.1 spike, mechanism confirmed live** (Claude Code 2.1.291,
+Status: **v0.2.0 (UI), mechanism confirmed live** (Claude Code 2.1.291,
 gsd-core hooks installed through settings.json): the mod saw a gsd-core
 PostToolUse advisory and a PreToolUse deny in a real session. Plugin-install
 gsd-core is not yet checked. Results: `../../research/spike-results-gsd-whisper.md`.
 
 ## What you see
 
-- A dim transcript line when a gsd-core hook speaks to the agent:
-  `GSD told the agent: context warning (34% left): agent told to wrap up`,
-  `GSD blocked Read: Secret read guard: Read would read '.env' ...`.
-  The same message is said at most once a minute.
-- A toast at gsd-core's context WARNING and CRITICAL thresholds.
-- At CRITICAL, a band above the prompt with **Pause work** (fills
+- **A badge under the tool row** a gsd-core hook spoke about, in your theme's
+  colours: `GSD [ BLOCKED ] secret-read-guard: Secret read guard: Read would
+  read '.../spike/.env' ...` or `GSD [ ADVISED ] phase-boundary: .planning edit
+  (...)`. Reads and searches that fold into one group line get one badge on
+  the group.
+- **A toast** for a message tied to no tool call (session start, Stop), at
+  most once a minute per message, and at gsd-core's context WARNING and
+  CRITICAL thresholds.
+- **At CRITICAL, a band above the prompt** with **Pause work** (fills
   `/gsd-pause-work` into the prompt; you press Enter) and **Dismiss**.
-- `/gsd-whisper`: the last 15 messages and per-event counts.
+- **`/gsd-whisper`** opens a pane: counts (blocked / asked / advised) and the
+  session's history, newest first, with a Clear button. Where no pane can be
+  placed it answers with the same history as text.
 
 ## What it never does
 
