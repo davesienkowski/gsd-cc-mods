@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, RenderChildren } from 'claude-code'
 
 import type { PilotAction, PilotSnapshot, PilotStatus } from '../types'
 import { buildSnapshot } from './snapshot'
@@ -78,8 +78,60 @@ async function gsdJson<T>($: EngineInterface, args: string[]): Promise<GsdResult
 // ---- palette
 
 const PANE = 'gsd-pilot'
-const CARD_BG = 'userMessageBackground'
 const CAPTURE_KINDS: Record<string, string> = { todo: '', note: '--note ', seed: '--seed ', backlog: '--backlog ' }
+
+// ---- pane placement: the gsd-status-mod setup (a docked pane opened at
+// session start, `openOnStart` to turn that off), plus what it leaves out.
+//
+// A pane docks beside the transcript only in Claude Code's fullscreen layout
+// (`/tui fullscreen`); on the main screen it sits inline above the prompt. So
+// the pilot opens unasked only where it would be a sidebar, and says why it is
+// waiting instead of failing silently: in an Orca split the terminal is often
+// under the 144 columns an unasked pane needs (110 once /gsd has opened it).
+
+const PANE_SIZE = { columns: 64, rows: 18 }
+const LAYOUT_KEY = 'fullscreen'
+const HINTED_KEY = 'hinted-main-screen'
+
+let openOnStart = true
+let fullscreen: boolean | undefined // as a render or command last reported it; fixed per session
+let autoTried = false
+let closedByHand = false
+
+export const MAIN_SCREEN_HINT =
+  'Claude Code is on its main-screen layout, so the pane sits above the prompt. Run /tui fullscreen to dock it on the right (Orca included).'
+
+export function waitingHint(reason: string): string {
+  return `GSD pilot pane is waiting: ${reason.replace(/\.?\s*$/, '.')} Run /gsd to open it now.`
+}
+
+function noteLayout(v: { isFullscreen?: boolean } | undefined): void {
+  if (typeof v?.isFullscreen === 'boolean') fullscreen = v.isFullscreen
+}
+
+async function keepLayout($: EngineInterface): Promise<void> {
+  if (fullscreen !== undefined && (await $.store.get(LAYOUT_KEY)) !== fullscreen) await $.store.set(LAYOUT_KEY, fullscreen)
+}
+
+// The unasked open, tried once per session as soon as the layout is known:
+// this session's (from a render) or, before the first render, the last one's.
+async function autoOpen($: EngineInterface): Promise<void> {
+  if (autoTried || closedByHand || !openOnStart) return
+  if ((await read($, snapshot)) === null) return
+  const stored = await $.store.get(LAYOUT_KEY)
+  const layout = fullscreen ?? (typeof stored === 'boolean' ? stored : undefined)
+  if (layout === undefined) return
+  autoTried = true
+  if (!layout) {
+    if ((await $.store.get(HINTED_KEY)) !== true) {
+      await $.store.set(HINTED_KEY, true)
+      $.ui.toast(`gsd-pilot: ${MAIN_SCREEN_HINT}`)
+    }
+    return
+  }
+  const opened = await $.ui.open({ id: PANE, title: 'GSD pilot', ...PANE_SIZE })
+  if (!opened.isPlaced) $.ui.toast(waitingHint(opened.reason))
+}
 
 let lastRefresh = 0
 let refreshing: Promise<void> | null = null
@@ -161,7 +213,8 @@ async function filesFor($: EngineInterface, s: PilotSnapshot, kind: string, id: 
   return out.map(f => `${phasesDir}/${dir}/${f}`)
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  openOnStart = options.openOnStart !== false
   on('session.start', async ($, e, next) => {
     await $.command.register({ name: 'gsd', description: 'GSD palette: the moves that fit now, one key away' })
     await $.command.register({
@@ -174,22 +227,45 @@ export const register: Register = on => {
       description: "Attach a GSD phase's or plan's files to your next prompt",
       argumentHint: 'phase <N> | plan <NN-MM>',
     })
-    void refresh($)
+    // Read first: the pane opens unasked only in a GSD project.
+    if (e.isInteractive) void refresh($).then(() => autoOpen($))
+    else void refresh($)
     return next(e)
   })
 
   // After each main-loop turn, re-read: the agent may have moved GSD state on.
+  // The first turn also settles the layout a first-ever session did not know.
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
-    if (e.agentId === undefined && (await $.clock.now()) - lastRefresh > 2_000) void refresh($)
+    if (e.agentId === undefined) {
+      if ((await $.clock.now()) - lastRefresh > 2_000) void refresh($).then(() => autoOpen($))
+      else void autoOpen($)
+      void keepLayout($)
+    }
     return result
   })
 
-  on('command.run', { command: 'gsd' }, async $ => {
+  on('command.run', { command: 'gsd' }, async ($, e) => {
+    noteLayout(e.presentation)
+    closedByHand = false
     await refresh($)
-    const opened = await $.ui.open({ id: PANE, title: 'GSD pilot' })
-    if (opened.isPlaced) return { text: 'Opened the GSD pilot.' }
+    const opened = await $.ui.open({ id: PANE, title: 'GSD pilot', ...PANE_SIZE })
+    void keepLayout($)
+    if (opened.isPlaced) return { text: `Opened the GSD pilot.${e.presentation?.isFullscreen === false ? ` ${MAIN_SCREEN_HINT}` : ''}` }
     return { text: asText(await read($, snapshot), await read($, status)) }
+  })
+
+  // Closed with its close mark (or ctrl+x x): not reopened unasked this session.
+  on('ui.close', { id: PANE }, async ($, e, next) => {
+    const result = await next(e)
+    if (e.origin.kind === 'person') closedByHand = true
+    return result
+  }).catch(($, e, next) => next(e))
+
+  // Nothing drawn here: the band is where the layout is known before any pane is.
+  on('ui.render', { component: 'AbovePrompt' }, ($, e, next) => {
+    noteLayout(e.viewport)
+    return next(e)
   })
 
   on('command.run', { command: 'gsd-grab' }, async ($, e) => {
@@ -218,91 +294,127 @@ export const register: Register = on => {
     return { text: `Attached ${found.length} file(s) from ${kind} ${id} to your prompt.` }
   })
 
+  // The palette, drawn as gsd-status-mod draws its pane: a centred header, then
+  // one round-bordered panel per topic, its title left and a note on the right.
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Button, Text } = $.ui.resolve(e)
+    noteLayout(e.viewport)
+    const W = Math.max(40, e.props.bodyColumns)
     const s = await read($, snapshot)
     const st = await read($, status)
+    const panel = (key: string, color: string, title: string, right: RenderChildren, children: RenderChildren[]) => (
+      <Box key={key} flexDirection="column" borderStyle="round" borderColor={color} paddingX={1} width={W}>
+        <Box justifyContent="space-between">
+          <Text bold wrap="truncate">
+            {title}
+          </Text>
+          {right}
+        </Box>
+        {children}
+      </Box>
+    )
+    const footer = (
+      <Box key="footer">
+        <Button key="refresh" label="refresh" plain hotkey="r" onPress={() => refresh($)} />
+        <Text color="subtle" wrap="truncate">
+          {'  buttons fill the prompt; keys after ctrl+x, tab'}
+        </Text>
+      </Box>
+    )
     if (s === null) {
       return (
-        <Box flexDirection="column">
-          <Text color="subtle">{st.text}</Text>
-          <Button key="refresh" label="Refresh" hotkey="r" onPress={() => refresh($)} />
+        <Box flexDirection="column" width={W}>
+          <Box justifyContent="center">
+            <Text bold>GSD pilot</Text>
+          </Box>
+          {panel('none', 'subtle', 'no GSD project here', null, [
+            <Text key="why" color="subtle">
+              {st.text}
+            </Text>,
+          ])}
+          {footer}
         </Box>
       )
     }
     const fill = (a: PilotAction) => () => $.prompt.fill({ text: a.command, mode: 'replace' })
+    const v = s.verification
     return (
-      <Box flexDirection="column">
-        <Box>
-          <Text color="claude" bold>
-            {`GSD ${s.milestone ?? ''}`}
+      <Box flexDirection="column" width={W}>
+        <Box justifyContent="center">
+          <Text bold wrap="truncate">
+            <Text color="claude">GSD pilot</Text>
+            {s.milestone ? ` · ${s.milestone}` : ''}
           </Text>
-          <Text>{`  ${s.situation}`}</Text>
-          {s.progress && <Text color="subtle">{`  ${s.progress}`}</Text>}
         </Box>
-        {s.activePhase && <Text color="subtle" wrap="truncate-end">{`Active: ${s.activePhase}`}</Text>}
-        {s.isElsewhere && <Text color="subtle" wrap="truncate-middle">{`Reading ${s.planningRoot}`}</Text>}
-
-        {s.verification && (
-          <Box
-            key="verify"
-            flexDirection="column"
-            marginTop={1}
-            paddingX={1}
-            borderStyle="round"
-            borderColor={statusColor(s.verification.status)}
-            backgroundColor={CARD_BG}
-          >
-            <Box>
-              <Text bold>{`Phase ${s.verification.phaseId} verification `}</Text>
-              <Text color={statusColor(s.verification.status)} inverse>
-                {` ${s.verification.status.toUpperCase()} `}
+        {panel(
+          'state',
+          'claude',
+          s.situation,
+          s.progress ? <Text color="subtle">{s.progress}</Text> : null,
+          [
+            s.activePhase ? (
+              <Text key="active" wrap="truncate-end">
+                {`active  ${s.activePhase}`}
               </Text>
-            </Box>
-            <Text color="subtle" wrap="truncate-end">
-              {s.verification.nextAction}
-            </Text>
-            {s.verification.command && (
-              <Button
-                key="verify-go"
-                label={s.verification.command}
-                hotkey="v"
-                onPress={() => $.prompt.fill({ text: s.verification!.command!, mode: 'replace' })}
-              />
-            )}
-          </Box>
+            ) : null,
+            s.isElsewhere ? (
+              <Text key="where" color="subtle" wrap="truncate-middle">
+                {`reading ${s.planningRoot}`}
+              </Text>
+            ) : null,
+          ],
         )}
-
-        <Box
-          key="moves"
-          flexDirection="column"
-          marginTop={1}
-          paddingX={1}
-          borderStyle="round"
-          borderColor="claude"
-          backgroundColor={CARD_BG}
-        >
-          <Text bold>Moves that fit now</Text>
-          {s.actions.length === 0 && <Text color="subtle">{st.kind === 'error' ? st.text : 'None offered.'}</Text>}
-          {s.actions.slice(0, 9).map((a, i) => (
-            <Box key={`move-${i}`}>
-              <Button
-                key={`go-${i}`}
-                label={a.command}
-                hotkey={String(i + 1)}
-                variant={a.isRecommended ? 'primary' : 'secondary'}
-                onPress={a.isAvailable ? fill(a) : () => undefined}
-              />
-              <Text color={a.isAvailable ? 'text' : 'subtle'} wrap="truncate-end">
-                {`  ${a.label}${a.isRecommended ? '  (recommended)' : ''}${a.isAvailable ? '' : '  (not installed)'}`}
+        {v &&
+          panel(
+            'verify',
+            statusColor(v.status),
+            `phase ${v.phaseId} verification`,
+            <Text color={statusColor(v.status)} inverse>
+              {` ${v.status.toUpperCase()} `}
+            </Text>,
+            [
+              <Text key="next" color="subtle" wrap="truncate-end">
+                {v.nextAction}
+              </Text>,
+              v.command ? (
+                <Button
+                  key="verify-go"
+                  label={v.command}
+                  plain
+                  hotkey="v"
+                  onPress={() => $.prompt.fill({ text: v.command!, mode: 'replace' })}
+                />
+              ) : null,
+            ],
+          )}
+        {panel(
+          'moves',
+          'claude',
+          'moves that fit now',
+          <Text color="subtle">{s.actions.length > 0 ? `1-${Math.min(9, s.actions.length)}` : ''}</Text>,
+          [
+            s.actions.length === 0 ? (
+              <Text key="none" color="subtle">
+                {st.kind === 'error' ? st.text : 'None offered.'}
               </Text>
-            </Box>
-          ))}
-        </Box>
-        <Box marginTop={1}>
-          <Button key="refresh" label="Refresh" hotkey="r" onPress={() => refresh($)} />
-          <Text color="subtle">{'  Buttons fill the prompt; you press Enter. Keys: ctrl+x, tab, then 1-9 / v / r.'}</Text>
-        </Box>
+            ) : null,
+            ...s.actions.slice(0, 9).map((a, i) => (
+              <Box key={`move-${i}`}>
+                <Button
+                  key={`go-${i}`}
+                  label={a.command}
+                  plain
+                  hotkey={String(i + 1)}
+                  onPress={a.isAvailable ? fill(a) : () => undefined}
+                />
+                <Text color={a.isRecommended ? 'claude' : a.isAvailable ? 'text' : 'subtle'} wrap="truncate-end">
+                  {`  ${a.isRecommended ? '★ ' : ''}${a.label}${a.isAvailable ? '' : '  (not installed)'}`}
+                </Text>
+              </Box>
+            )),
+          ],
+        )}
+        {footer}
       </Box>
     )
   })

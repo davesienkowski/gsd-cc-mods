@@ -1,6 +1,7 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
 
+import { MAIN_SCREEN_HINT, waitingHint } from '../hooks/register'
 import { buildSnapshot, resolveCommand } from '../hooks/snapshot'
 
 // Shapes as gsd-tools 1.16 answered them on a real project (2026-10-06).
@@ -53,9 +54,16 @@ describe('snapshot', () => {
   })
 })
 
-function world(on: On, opts: { installed?: boolean; selection?: string } = {}) {
+type WorldOpts = { installed?: boolean; selection?: string; layout?: boolean; placed?: boolean; hinted?: boolean }
+
+function world(on: On, opts: WorldOpts = {}) {
   const filled: string[] = []
   const ran: string[][] = []
+  const opened: Array<{ columns?: number; rows?: number }> = []
+  const toasts: string[] = []
+  const store = new Map<string, unknown>()
+  if (opts.layout !== undefined) store.set('fullscreen', opts.layout)
+  if (opts.hinted) store.set('hinted-main-screen', true)
   mock.clock(on)
   on('env.get', ($, e) => ({ value: e.name === 'HOME' ? '/home/u' : undefined }) as never)
   on('fs.exists', ($, e) => ({ value: opts.installed !== false && e.path === TOOLS }) as never)
@@ -75,7 +83,19 @@ function world(on: On, opts: { installed?: boolean; selection?: string } = {}) {
   on('command.list', () => ({ value: NAMES.map(name => ({ name })) }) as never)
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('session.start', ($, e) => ({ cwd: e.cwd }))
-  on('ui.open', () => ({ value: { isPlaced: true } }) as never)
+  on('ui.open', ($, e) => {
+    opened.push({ columns: e.columns, rows: e.rows })
+    return { value: opts.placed === false ? { isPlaced: false, reason: 'opened unasked below 144 columns (now 96).' } : { isPlaced: true } } as never
+  })
+  on('ui.toast', ($, e) => {
+    toasts.push(e.text)
+    return { value: undefined } as never
+  })
+  on('store.get', ($, e) => ({ value: store.get(e.key) }) as never)
+  on('store.set', ($, e) => {
+    store.set(e.key, e.value)
+    return { value: undefined } as never
+  })
   on('ui.selection', () => ({ value: opts.selection === undefined ? undefined : { text: opts.selection } }) as never)
   on('prompt.fill', ($, e) => {
     filled.push(e.text)
@@ -93,8 +113,13 @@ function world(on: On, opts: { installed?: boolean; selection?: string } = {}) {
           ]
     return { value: entries } as never
   })
-  return { filled, ran }
+  return { filled, ran, opened, toasts, store }
 }
+
+// Lets the unawaited refresh-then-open chain behind session.start settle. The
+// test runner has timers; the mod environment (and so its typings) has none.
+declare const setTimeout: (fn: () => void, ms: number) => unknown
+const settle = () => new Promise<void>(resolve => setTimeout(resolve, 150))
 
 const PANE = {
   plugin: 'gsd-pilot',
@@ -162,5 +187,61 @@ describe('register', () => {
     ])
     expect((await $.command.run(run('gsd-attach', 'phase 7'))).text).toContain('No phase 7')
     expect((await $.command.run(run('gsd-attach', 'banana'))).text).toContain('Usage')
+  })
+
+  test('a fullscreen session docks the pane on start, at the gsd-status-mod size', async ($, on) => {
+    const { opened, toasts } = world(on, { layout: true })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([{ columns: 64, rows: 18 }])
+    expect(toasts).toEqual([])
+  })
+
+  test('openOnStart off: nothing opens unasked', { options: { openOnStart: false } }, async ($, on) => {
+    const { opened } = world(on, { layout: true })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([])
+  })
+
+  test('main-screen layout: no unasked pane, one hint ever, and /gsd says how to dock', async ($, on) => {
+    const { opened, toasts, store } = world(on, { layout: false })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([])
+    expect(toasts).toEqual([`gsd-pilot: ${MAIN_SCREEN_HINT}`])
+    expect(store.get('hinted-main-screen')).toBe(true)
+    const { text } = await $.command.run({ ...(run('gsd') as object), presentation: { isFullscreen: false, columns: 96 } } as never)
+    expect(text).toContain('/tui fullscreen')
+  })
+
+  test('main-screen layout already hinted: stays quiet', async ($, on) => {
+    const { toasts } = world(on, { layout: false, hinted: true })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(toasts).toEqual([])
+  })
+
+  test('a narrow Orca split: the waiting pane says why instead of failing silently', async ($, on) => {
+    const { toasts } = world(on, { layout: true, placed: false })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(toasts).toEqual([waitingHint('opened unasked below 144 columns (now 96).')])
+    expect(toasts[0]).toContain('Run /gsd to open it now.')
+  })
+
+  test('layout unknown (first session): waits for a render to say', async ($, on) => {
+    const { opened, toasts } = world(on)
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([])
+    expect(toasts).toEqual([])
+  })
+
+  test('outside a GSD project nothing opens unasked', async ($, on) => {
+    const { opened } = world(on, { layout: true, installed: false })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([])
   })
 })
