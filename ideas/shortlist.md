@@ -3,7 +3,7 @@
 Built from the catalog after lens 1 (artificer laws), lens 2 (adversarial,
 re-checked), lens 3 (edge and prohibition probes) and lens 4 (quantifiers).
 Every mod obeys the lens 3 prohibitions P1-P12 and answers edge probes
-E1-E16.
+EP1-EP16.
 
 ## The open space
 
@@ -61,9 +61,10 @@ The action layer.
 
 ### 3. `gsd-nightwatch`
 For `/gsd-autonomous` and long execute waves.
-- F1: sound + toast (+ system notification where available) when the run
-  needs a person: an AskUserQuestion call, a permission prompt, or a turn that
-  ends with no agent running.
+- F1: sound + toast when the run needs a person: an AskUserQuestion call, a
+  permission prompt (`classic.PermissionRequest` / `classic.Notification`,
+  both in the types), or a turn that ends with no agent running. An OS-level
+  notification has no `$` noun; whether to shell out for one is spike S7.
 - C3: when an executor loop completes without its plan's SUMMARY (via
   `phase-plan-index` `has_summary`), a toast and a notice row.
 - F2 reshaped: for a long-quiet agent, its last tool call (not another clock).
@@ -103,6 +104,7 @@ Every rule `off | warn | deny`, default `warn`; no rule language.
 | S3 | Can a `ToolResult` render hook add one dim line without replacing the engine's row, alongside gsd-status-mod's own added line? | gsd-whisper, coexistence |
 | S4 | `$.agent.list()` gives the agent type for a `tool.call` `agentId` inside a GSD executor? | gsd-hygiene C1, nightwatch C3 |
 | S5 | Which `/gsd-capture` form accepts quoted text cleanly via `$.prompt.fill`? | gsd-pilot B2 |
+| S7 | OS notification for F1: is a host command (`notify-send`, `osascript`, a Windows toast) worth an opt-in `$.process.run`, given mods are not sandboxed? | gsd-nightwatch F1 (sound + toast work without it) |
 | S6 | Cost of `planning inspect` + `smart-entry --json` per turn on a large project | gsd-pilot |
 
 ## Upstream proposals (gsd-core issues, not mods)

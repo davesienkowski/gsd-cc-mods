@@ -66,7 +66,7 @@ entry as a recommendation until `shortlist.md` names it.
 A one-line band: `plan-phase 3 > research > plan-checker pass 2/3`. Knows which
 `/gsd-*` workflow is expanding because `skill.prompt` fires per skill expansion;
 step position comes from the stage banners (`GSD > STAGE`) the workflow already
-prints (ui-brand.md:49), read from `turn.step` / AssistantMessage text.
+prints (ui-brand.md:49; the source uses `►`, U+25BA, written `>` here per this repo's ASCII rule, so a parser must match `►`), read from `turn.step` / AssistantMessage text.
 Events: `skill.prompt` (observe only), `session.append` (observe), `ui.render`
 AbovePrompt. Data: skill name, banner text. Overlap: none found (gsd-status-mod
 cannot see the running workflow). Risk: api. Grounding: admit for the skill
