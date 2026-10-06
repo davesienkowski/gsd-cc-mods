@@ -19,8 +19,9 @@ unsampled leads.
 - Checkpoint panels ("CHECKPOINT: Verification Required", "Decision
   Required") -> `ui-brand.md:65-81`, `execute-plan.md` human-verify returns ->
   real Approve / Describe-issue buttons and a pending-checkpoint indicator.
-- AskUserQuestion-heavy workflows (about 60 use it; new-project ~18,
-  settings-advanced ~15, new-milestone ~13) -> a decision-log pane per run.
+- AskUserQuestion-heavy workflows (47 of 89 top-level workflow files mention it,
+  60 counting nested files; mentions: new-project 18,
+  settings-advanced 15, new-milestone 13) -> a decision-log pane per run.
 - execute-phase interactive menu (execute / review-first / skip / stop) ->
   buttons.
 
