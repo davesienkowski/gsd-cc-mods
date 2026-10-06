@@ -1,0 +1,22 @@
+{
+  "name": "gsd-cc-mods",
+  "owner": { "name": "Dave Sienkowski", "url": "https://github.com/davesienkowski" },
+  "metadata": { "description": "Claude Code mods for GSD (gsd-core) projects, plus a companion dashboard by Helen Kwok." },
+  "plugins": [
+    {
+      "name": "gsd-pilot",
+      "source": "./mods/gsd-pilot",
+      "description": "A docked palette of the GSD moves that fit now, verification status, capture and attach."
+    },
+    {
+      "name": "gsd-whisper",
+      "source": "./mods/gsd-whisper",
+      "description": "Shows what gsd-core's hooks tell the agent: tool-row cards, a history pane, a CRITICAL band."
+    },
+    {
+      "name": "gsd-status-mod",
+      "source": { "source": "github", "repo": "helenkwok/gsd-status-mod" },
+      "description": "By Helen Kwok, installed from her repository: a live GSD dashboard pane (roadmap, agents, pace, reader), status band and next-action hint."
+    }
+  ]
+}

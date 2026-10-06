@@ -4,12 +4,18 @@ A Claude Code mod that puts the right [GSD](https://github.com/open-gsd/gsd-core
 move one keystroke away. It shows what gsd-core already computed and offers it
 as buttons that **fill** the prompt; you press Enter.
 
-Status: **v0.1.0.** Validated, type-checked and unit-tested against Claude
+Status: **v0.2.0.** Validated, type-checked and unit-tested against Claude
 Code 2.1.291; live check pending.
 
 ## What you get
 
-- **`/gsd`**: a palette pane.
+- **`/gsd`**: a palette pane, docked on the right in the gsd-status-mod
+  style and opened on session start in a GSD project (option `openOnStart`,
+  on by default). It opens on its own only in Claude Code's fullscreen layout
+  (`/tui fullscreen`); on the main screen you get one hint, once, and `/gsd`
+  opens it above the prompt. If it has to wait for width (an unasked pane
+  needs 144 columns, 110 once you have opened it by hand), it says so. See
+  "Panes (and Orca)" in the repository README.
   - The milestone, the situation gsd-core reports, plan progress, and which
     `.planning` it is reading (said when that is not your working folder, for
     example from a linked worktree).

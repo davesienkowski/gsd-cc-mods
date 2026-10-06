@@ -2,6 +2,9 @@
   "name": "gsd-pilot",
   "version": "0.2.0",
   "description": "One keystroke to the right GSD move: a docked palette of the commands that fit now, verification status, capture and attach.",
+  "author": {
+    "name": "Dave Sienkowski"
+  },
   "types": "./types/index.d.ts",
   "userConfig": {
     "openOnStart": {

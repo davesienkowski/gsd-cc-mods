@@ -2,6 +2,9 @@
   "name": "gsd-whisper",
   "version": "0.3.0",
   "description": "Shows you what gsd-core's hooks quietly tell the agent: context warnings, guard advice and guard denials.",
+  "author": {
+    "name": "Dave Sienkowski"
+  },
   "types": "./types/index.d.ts",
   "userConfig": {
     "openOnStart": {
