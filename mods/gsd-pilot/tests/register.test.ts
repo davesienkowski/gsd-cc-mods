@@ -244,4 +244,29 @@ describe('register', () => {
     await settle()
     expect(opened).toEqual([])
   })
+
+  test('a remembered main screen is overruled once this session reports fullscreen (after /tui fullscreen)', async ($, on) => {
+    const { opened } = world(on, { layout: false, hinted: true })
+    on('turn.complete', ($, e) => ({ text: e.answer }))
+    // The engine's own band, beneath the plugin.
+    on('ui.render', ($, e) => {
+      const { Box } = $.ui.resolve(e)
+      return h(Box, { key: 'engine' }) as never
+    })
+    await $.session.start({ surface: 'terminal', isInteractive: true, cwd: '/work' })
+    await settle()
+    expect(opened).toEqual([])
+    const band = await $.ui.mount({
+      plugin: 'gsd-pilot',
+      surface: 'terminal',
+      component: 'AbovePrompt',
+      props: { hasSurvey: false, isWorking: false, maxRows: 3, bodyColumns: 160, scroll: { offset: 0, bodyRows: 3 }, view: {} },
+      viewport: { columns: 160, rows: 40, isFullscreen: true },
+    } as never)
+    await band.unmount()
+    await $.turn.complete({ answer: 'done', durationMs: 1, isAborted: false, turnId: 't1', reason: 'end_turn' } as never)
+    await settle()
+    expect(opened).toEqual([{ columns: 64, rows: 18 }])
+  })
 })
+

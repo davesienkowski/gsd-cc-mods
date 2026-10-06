@@ -121,7 +121,9 @@ async function autoOpen($: EngineInterface): Promise<void> {
   const stored = await $.store.get(LAYOUT_KEY)
   const layout = fullscreen ?? (typeof stored === 'boolean' ? stored : undefined)
   if (layout === undefined) return
-  autoTried = true
+  // A remembered layout is a guess (the person may have run /tui since): it can
+  // open the pane early, but only this session's own report settles a "no".
+  if (layout || fullscreen !== undefined) autoTried = true
   if (!layout) {
     if ((await $.store.get(HINTED_KEY)) !== true) {
       await $.store.set(HINTED_KEY, true)
