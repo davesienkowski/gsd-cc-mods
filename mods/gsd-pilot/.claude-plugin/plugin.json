@@ -1,0 +1,6 @@
+{
+  "name": "gsd-pilot",
+  "version": "0.1.0",
+  "description": "One keystroke to the right GSD move: a palette of the commands that fit now, verification status, capture and attach.",
+  "types": "./types/index.d.ts"
+}
