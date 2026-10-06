@@ -39,8 +39,14 @@ which is what this repository is.
 
 ## Status
 
-Exploration complete (2026-10-06). Nothing here is installable yet. Next step:
-spikes S1-S3 in a live Claude Code session, then build gsd-whisper.
+- `mods/gsd-whisper` v0.2.2: shows what gsd-core's hooks tell the agent (tool-row
+  cards, history pane, CRITICAL band). Mechanism confirmed live; see
+  `research/spike-results-gsd-whisper.md`.
+- `mods/gsd-pilot` v0.1.0: `/gsd` palette of the moves that fit now, phase
+  verification card, `/gsd-grab`, `/gsd-attach`. Unit-tested; live check
+  pending.
+
+Install either from a clone with `claude --plugin-dir mods/<name>`.
 
 ## License
 

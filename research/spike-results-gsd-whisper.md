@@ -72,6 +72,21 @@ hot reload enabled. gsd-core hooks installed through `~/.claude/settings.json`
   keyed by `tool_use_id` (written through `memberOf(byCall, { requestId })`),
   so a new message redraws only its own row.
 
+## Found while building gsd-pilot
+
+- **`$` is not followed across an import.** `claude plugin validate` refused a
+  module that passed `$` to a function imported from another file of the
+  plugin: "$ is followed only into a function declared in this same file".
+  Anything that takes `$` lives in the hooks module itself; pure helpers can be
+  imported.
+- **`smart-entry` answers in the retired colon form.** `gsd-tools smart-entry
+  --json` returned `"/gsd:progress --next"`, `"/gsd:execute-phase"` (gsd-core
+  1.16.0 installed copy, 2026-10-06), while gsd-core's own
+  `src/runtime-slash.cts` says the colon form "is no longer" used and Claude
+  takes `/gsd-<cmd>`, and this install registers only `gsd-*` skills. Possibly
+  an upstream gap (smart-entry not routing through `formatGsdSlash`); not
+  checked against `next` source line by line, nothing filed.
+
 ## Not yet checked
 
 - S3: how the badge, pane and CRITICAL band look on screen, and
