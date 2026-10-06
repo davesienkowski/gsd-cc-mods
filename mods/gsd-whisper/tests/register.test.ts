@@ -36,6 +36,8 @@ describe('classify', () => {
     expect(classify(CRITICAL)?.rule).toBe('context-critical')
     expect(classify(READ_GUARD)?.summary).toContain('STATE.md')
     expect(classify(SECRET)?.rule).toBe('secret-read-guard')
+    // as the engine hands a settings hook's deny to a mod (seen live on 2.1.291)
+    expect(classify('PreToolUse:Read hook error: ' + SECRET)?.rule).toBe('secret-read-guard')
     expect(classify('⚠️ WORKFLOW ADVISORY: You\'re editing app.ts directly without a GSD command.')?.rule).toBe(
       'workflow-guard',
     )
@@ -43,6 +45,12 @@ describe('classify', () => {
       'phase-boundary',
     )
     expect(classify('Commit subject must be 72 characters or less.')?.rule).toBe('validate-commit')
+    expect(classify('.planning/ file modified: /tmp/a/b/c/spike/.planning/x.md\nCheck: Should STATE.md be updated?')?.summary).toBe(
+      '.planning edit (.../.planning/x.md): agent asked whether STATE.md needs updating',
+    )
+    expect(classify("Secret read guard: Read would read '/tmp/a/b/c/spike/.env', which matches.")?.summary).toContain(
+      "'.../spike/.env'",
+    )
     expect(classify('praxis: some other hook said this')).toBeNull()
     expect(classify('')).toBeNull()
   })

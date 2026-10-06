@@ -16,8 +16,12 @@ type Rule = {
   summary: (m: RegExpMatchArray, text: string) => string
 }
 
+// Long absolute paths make a line unreadable; keep the last two segments.
+export const shortPaths = (text: string): string =>
+  text.replace(/(?:\/[^\s'"/]+){3,}\/([^\s'"/]+\/[^\s'"/]+)/g, '.../$1')
+
 const firstSentence = (text: string, max = 140): string => {
-  const one = text.replace(/\s+/g, ' ').trim()
+  const one = shortPaths(text.replace(/\s+/g, ' ').trim())
   const cut = one.search(/\.\s/)
   const head = cut > 0 ? one.slice(0, cut + 1) : one
   return head.length > max ? head.slice(0, max - 3) + '...' : head
@@ -67,7 +71,7 @@ const RULES: Rule[] = [
   {
     rule: 'phase-boundary',
     test: /^\.planning\/ file modified: (.+)/,
-    summary: m => `.planning edit (${(m[1] ?? '').trim()}): agent asked whether STATE.md needs updating`,
+    summary: m => `.planning edit (${shortPaths((m[1] ?? '').trim())}): agent asked whether STATE.md needs updating`,
   },
   {
     rule: 'session-state',
@@ -106,8 +110,11 @@ const RULES: Rule[] = [
   },
 ]
 
-// Hooks prefix some texts with a warning sign; ignore leading symbols and space.
-const strip = (text: string) => text.replace(/^[^A-Za-z#.]+/, '')
+// The engine leads a settings hook's deny with where it came from
+// ("PreToolUse:Read hook error: ", seen live on 2.1.291), and hooks lead some
+// texts with a warning sign; drop both before matching.
+const ENGINE_PREFIX = /^[A-Za-z]+(?::[A-Za-z0-9_]+)? hook (?:blocking )?error: /
+const strip = (text: string) => text.trim().replace(ENGINE_PREFIX, '').replace(/^[^A-Za-z#.]+/, '')
 
 export const classify = (text: string): Recognized | null => {
   const body = strip(text)

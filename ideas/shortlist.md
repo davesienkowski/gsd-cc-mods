@@ -99,8 +99,8 @@ Every rule `off | warn | deny`, default `warn`; no rule language.
 
 | ID | Question | Blocks |
 |---|---|---|
-| S1 | Does a mod's `next(e)` on `classic.PostToolUse` return gsd-core's context-monitor `additionalContext` for a settings.json install AND for a plugin install? | gsd-whisper |
-| S2 | Does a classic PreToolUse deny from gsd-core reach a mod's `tool.call` result with its reason text? | gsd-whisper I2 |
+| S1 | Does a mod's `next(e)` on `classic.PostToolUse` return gsd-core's `additionalContext` for a settings.json install AND for a plugin install? **Settings.json: CONFIRMED 2026-10-06** (research/spike-results-gsd-whisper.md); plugin install: open | gsd-whisper |
+| S2 | Does a classic PreToolUse deny from gsd-core reach a mod with its reason text? **CONFIRMED 2026-10-06**, text arrives prefixed `PreToolUse:<Tool> hook error: ` | gsd-whisper I2 |
 | S3 | Can a `ToolResult` render hook add one dim line without replacing the engine's row, alongside gsd-status-mod's own added line? | gsd-whisper, coexistence |
 | S4 | `$.agent.list()` gives the agent type for a `tool.call` `agentId` inside a GSD executor? | gsd-hygiene C1, nightwatch C3 |
 | S5 | Which `/gsd-capture` form accepts quoted text cleanly via `$.prompt.fill`? | gsd-pilot B2 |

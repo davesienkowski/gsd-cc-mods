@@ -6,10 +6,10 @@ workflow advice, `.planning` edit reminders, and guard denials (secret reads,
 worktree paths, catastrophic STATE/ROADMAP shrinks, commit format, agent
 isolation).
 
-Status: **v0.1 spike.** Validated, type-checked and unit-tested against
-Claude Code 2.1.291's mod API; the live-session check (does a mod really see
-gsd-core's hook output, for settings.json installs and plugin installs) is in
-progress. See `../../ideas/shortlist.md` spike S1-S3.
+Status: **v0.1.1 spike, mechanism confirmed live** (Claude Code 2.1.291,
+gsd-core hooks installed through settings.json): the mod saw a gsd-core
+PostToolUse advisory and a PreToolUse deny in a real session. Plugin-install
+gsd-core is not yet checked. Results: `../../research/spike-results-gsd-whisper.md`.
 
 ## What you see
 
