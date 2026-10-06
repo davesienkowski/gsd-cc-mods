@@ -35,8 +35,8 @@ entry as a recommendation until `shortlist.md` names it.
    `smart-entry --json` gives `situation`, `recommended`, `signals`, `actions[]`.
 6. **Two kinds of surface.** Hooks run in the CLI, the Desktop Code tab, the
    VS Code chat panel and cloud sessions; drawing happens only in the CLI and
-   Desktop. Guard and prompt-shaping ideas reach every surface; pane and band
-   ideas reach two. Desktop WSL sessions load no plugins.
+   Desktop. Guard and prompt-shaping ideas reach every surface where mods
+   load; pane and band ideas reach two. Desktop WSL sessions load no plugins.
 7. **Transcript markers that already exist.** execute-phase prints
    `[checkpoint] phase X wave N/M plan P {starting|complete|failed|checkpoint}
    (P/Q plans done)` (execute-phase.md:511-517). Checkpoint boxes end in
@@ -49,7 +49,9 @@ entry as a recommendation until `shortlist.md` names it.
 
 - **Events**: the mod events or `$` calls used (from the 2.1.291 types).
 - **Data**: where the facts come from.
-- **Overlap**: what gsd-status-mod already does here.
+- **Overlap**: what gsd-status-mod already does here. "None found" means none in
+  gsd-status-mod's README or gsd-core's hooks as read; lens 2 found overlaps
+  this catalog missed (A4, A9, B1, C4) and those corrections stand.
 - **Risk**: `api` (leans on an event with no field history), `model` (changes
   what the model reads), `write` (writes files or runs commands), `guard`
   (refuses something).
@@ -58,7 +60,7 @@ entry as a recommendation until `shortlist.md` names it.
 
 ---
 
-## Lane A. See: state GSD has that nobody draws
+## Lane A. See: state GSD has that no surface read here draws
 
 **A1. Active-workflow band ("where am I in the GSD loop")**
 A one-line band: `plan-phase 3 > research > plan-checker pass 2/3`. Knows which
@@ -66,7 +68,7 @@ A one-line band: `plan-phase 3 > research > plan-checker pass 2/3`. Knows which
 step position comes from the stage banners (`GSD > STAGE`) the workflow already
 prints (ui-brand.md:49), read from `turn.step` / AssistantMessage text.
 Events: `skill.prompt` (observe only), `session.append` (observe), `ui.render`
-AbovePrompt. Data: skill name, banner text. Overlap: none (gsd-status-mod
+AbovePrompt. Data: skill name, banner text. Overlap: none found (gsd-status-mod
 cannot see the running workflow). Risk: api. Grounding: admit for the skill
 name; spike for banner parsing reliability.
 
@@ -78,17 +80,18 @@ pending-checkpoint marker stays in the status line until answered, so a
 checkpoint that scrolled away is not lost. Buttons call `$.prompt.fill` (never
 auto-submit). Events: `session.append` (observe assistant text for the
 checkpoint markers in ui-brand.md:65-81), `ui.render` AbovePrompt,
-`$.ui.status`, `$.prompt.fill`. Data: transcript text. Overlap: none. Risk:
+`$.ui.status`, `$.prompt.fill`. Data: transcript text. Overlap: none found. Risk:
 api. Grounding: spike (marker text stability across workflows).
 
 **A3. Decision ledger**
-Every AskUserQuestion answer during a GSD workflow (60 workflow files use it;
-new-project mentions it 18 times) is recorded with the question, the chosen
+Each AskUserQuestion answer during a GSD workflow (60 workflow files mention
+it, counting nested files; new-project mentions it 18 times; TEXT_MODE paths
+bypass the tool and are not captured) is recorded with the question, the chosen
 option, the workflow and the phase. A pane lists them per run, so "what did I
 pick in question 7 of new-project?" has an answer without scrolling. Export
 button writes a `DECISIONS-<date>.md` under `.planning/notes/` (opt-in write).
 Events: `tool.call` on AskUserQuestion (await `next`, read answer),
-`ui.render` Pane, `$.store`. Overlap: none. Risk: api; write (export only).
+`ui.render` Pane, `$.store`. Overlap: none found. Risk: api; write (export only).
 Grounding: admit (AskUserQuestion is a built-in tool with a typed input).
 
 **A4. Semantic diff under .planning edits**
@@ -97,7 +100,7 @@ a line under the ToolUse row that says what changed in GSD terms:
 `phase 3: planned -> executing`, `REQ AUTH-02 checked`, `must_haves +1`.
 Computed by calling `gsd-tools state-snapshot` / `roadmap` before and after.
 Events: `tool.call` (Edit/Write/MultiEdit on `.planning/**`, observe),
-`ui.render` ToolUse/ToolResult, `$.process.run`. Overlap: none. Risk: api.
+`ui.render` ToolUse/ToolResult, `$.process.run`. Overlap: none found. Risk: api.
 Grounding: admit for hooks; spike for ToolUse row rendering of an added line
 (gsd-status-mod already adds an "open in reader" line under such rows, which
 shows the site takes one).
@@ -107,14 +110,14 @@ During execute-phase / verify-work, a pane lists the current plan's
 `must_haves` (truths, artifacts, key links from PLAN.md frontmatter) and ticks
 each as the verifier reports it. Answers "is this plan actually done?" at a
 glance. Events: `ui.render` Pane, `turn.complete`. Data: `gsd-tools frontmatter`
-or `phase-plan-index`; VERIFICATION.md. Overlap: none. Risk: api. Grounding:
+or `phase-plan-index`; VERIFICATION.md. Overlap: none found. Risk: api. Grounding:
 abstain (the verify output format per must-have was not checked).
 
 **A6. Health and verification chip**
 A compact chip: `verify: stale` / `gaps_found` / `human_needed` / `passed`, and
 `health: W030` when `/gsd-health` codes fire, each with the command that fixes
 it as a Tab suggestion. Data: `gsd-tools verification status <phase-dir>`,
-`validate`. Overlap: none (gsd-status-mod shows drift, not verification).
+`validate`. Overlap: none found (gsd-status-mod shows drift, not verification).
 Risk: api. Grounding: spike (needs the phase dir resolved; the bare verb
 errors without it, measured).
 
@@ -125,7 +128,7 @@ shows the person a dim line when one fired: `GSD advised: read before edit`,
 `GSD: context at 30% left, agent told to wrap up`. The person then knows why
 the model changed course. Events: `classic.PostToolUse` / `classic.PreToolUse`
 observed for `additionalContext`, `ui.render` ToolResult or `$.ui.log`.
-Overlap: none. Risk: api. Grounding: spike (whether a mod can read a classic
+Overlap: none found. Risk: api. Grounding: spike (whether a mod can read a classic
 hook's `additionalContext` output is unverified).
 
 **A8. Per-phase cost and time ledger**
@@ -147,7 +150,7 @@ Events: `ui.render` Pane, `$.prompt.fill`. Data: `smart-entry`,
 **A10. Artifact hover cards**
 Hovering a `.planning/...` path in a ToolUse row shows what the artifact is
 (`PLAN.md: an executable plan, one per wave slot`) and its key frontmatter.
-Events: `ui.render` ToolUse with a keyed Box `hover` style. Overlap: none.
+Events: `ui.render` ToolUse with a keyed Box `hover` style. Overlap: none found.
 Risk: api. Grounding: spike (hover is fullscreen-terminal and desktop only).
 
 ## Lane B. Act: one keystroke to the right GSD move
@@ -167,13 +170,13 @@ todo / seed / note; the mod calls the matching `gsd-tools` capture verb (or
 fills `/gsd-capture --seed ...`) with the selection quoted. Turns "I should
 remember that" into an artifact in two keys. Events: `$.ui.selection`,
 `$.command.register`, `command.run`, `$.process.run` or `$.prompt.fill`.
-Overlap: none. Risk: write. Grounding: admit for selection; spike for which
+Overlap: none found. Risk: write. Grounding: admit for selection; spike for which
 capture verb takes stdin text.
 
 **B3. `@` mentions for GSD entities**
 `@phase:3`, `@plan:03-02`, `@req:AUTH-01`, `@seed:SEED-012` resolve to the
 right file(s) and attach them. Events: `prompt.mention` with
-`next({ ...e, path })` redirection. Overlap: none. Risk: api. Grounding: spike
+`next({ ...e, path })` redirection. Overlap: none found. Risk: api. Grounding: spike
 (the doc says the hook fires per `@path` before the read and can redirect, but
 whether it fires for a name that is not an existing path is unverified).
 
@@ -182,7 +185,7 @@ When the person types plain intent ("the login test is flaky"), classify it
 against GSD's routing table (debug / quick / explore / spike / capture) and
 show the matching command as a Tab suggestion; never rewrite the prompt.
 Events: `prompt.submit` (observe), `$.model.classify` or `$.model.complete`,
-`$.prompt.suggest`. Overlap: none (gsd-core has a `/gsd-do`-style dispatcher
+`$.prompt.suggest`. Overlap: none found (gsd-core has a `/gsd-do`-style dispatcher
 inside the model; this is out-of-band). Risk: api; spends a small model call
 per prompt (make it opt-in). Grounding: abstain (classify cost/latency not
 measured).
@@ -191,13 +194,13 @@ measured).
 `/gsd` opens a pane of the commands that are legal now (from `smart-entry`
 and `progress json`), grouped (continue / capture / inspect / repair), each a
 button that fills the prompt. Events: `$.command.register`, `ui.render` Pane,
-`$.prompt.fill`. Overlap: none. Risk: api. Grounding: admit.
+`$.prompt.fill`. Overlap: none found. Risk: api. Grounding: admit.
 
 **B6. UAT runner**
 `/gsd-verify-work`'s conversational UAT drawn as a checklist: each test case a
 row with Pass / Fail / Note buttons; a press fills the answer the workflow is
 waiting for. Events: `ui.render` Pane or AskUserQuestion site,
-`$.prompt.fill`. Data: UAT.md. Overlap: none. Risk: api. Grounding: abstain
+`$.prompt.fill`. Data: UAT.md. Overlap: none found. Risk: api. Grounding: abstain
 (UAT turn protocol not read).
 
 **B7. Resume card on session start**
@@ -217,7 +220,7 @@ config says; observe-or-deny only.
 Inside a `gsd-executor` subagent loop (`e.agentId` -> `$.agent.list()` type),
 deny `git add -A` / `git add .` (gsd-executor.md:520) and `git commit
 --no-verify` (execute-plan.md). Events: `tool.call` Bash, `$.agent.list`.
-Overlap: none. Risk: guard; api. Grounding: admit for agentId on tool.call
+Overlap: none found. Risk: guard; api. Grounding: admit for agentId on tool.call
 (types: `AgentLoop.agentId`); spike for reading the agent type from the id at
 call time.
 
@@ -226,7 +229,7 @@ During execute of plan N, an Edit/Write outside that plan's `files_modified`
 (PLAN.md frontmatter) raises a warning card: `03-02 did not declare
 src/auth.ts`, with Allow once / Add to plan / Deny. Keeps executors inside the
 plan's declared footprint. Events: `tool.call` Edit/Write/MultiEdit,
-`$.process.run` (`gsd-tools frontmatter`). Overlap: none. Risk: guard.
+`$.process.run` (`gsd-tools frontmatter`). Overlap: none found. Risk: guard.
 Grounding: spike (`files_modified` coverage in real plans unmeasured; plans
 that omit it must pass silently).
 
@@ -234,7 +237,7 @@ that omit it must pass silently).
 When a `gsd-executor` loop completes, check that its SUMMARY.md exists and
 STATE.md moved; if not, toast and add a notice row, so a silently incomplete
 plan is caught at the wave boundary rather than at verify. Events:
-`turn.complete` with `agentId`, `$.fs.stat`. Overlap: none. Risk: api.
+`turn.complete` with `agentId`, `$.fs.stat`. Overlap: none found. Risk: api.
 Grounding: admit.
 
 **C4. Visible context guard with a pause button**
@@ -251,18 +254,19 @@ On `session.compact`, add instructions telling the summarizer to keep the GSD
 anchors verbatim (current phase and plan, locked decisions, open checkpoint,
 must-haves, next command), and, if no handoff was written in the last N
 minutes, toast `compacting without a GSD handoff` first. Events:
-`session.compact` (rewrite `instructions` only). Overlap: none. Risk: model;
+`session.compact` (rewrite `instructions` only). Overlap: none found. Risk: model;
 api. Grounding: admit for the hook; abstain on whether summarizer
 instructions measurably improve recall (needs an eval).
 
 ## Lane D. Shape what the model reads (highest leverage, highest risk)
 
 **D1. Pre-resolved init for GSD workflows**
-Most workflows start by running `gsd-tools init <workflow>` through Bash and
-reading the JSON back. On `skill.prompt` for a `/gsd-*` skill, the mod runs
+Many workflows start by running `gsd-tools init <workflow>` through Bash and
+reading the JSON back (64 of 89 top-level workflow files match a loose grep
+for an init call; not checked one by one). On `skill.prompt` for a `/gsd-*` skill, the mod runs
 that init itself and appends its JSON to the skill text, saving one tool round
 trip per workflow start. Events: `skill.prompt` (append), `$.process.run`.
-Overlap: none. Risk: model (workflow text changes; gsd-core's gates assume
+Overlap: none found. Risk: model (workflow text changes; gsd-core's gates assume
 their own text); api. Grounding: spike (which workflows take which init verb;
 whether an appended block is honored or re-run anyway).
 
@@ -270,7 +274,7 @@ whether an appended block is honored or re-run anyway).
 A short `session`-scoped section: project, phase, plan, status, next command.
 Updated only when the phase or plan changes (`$.ui.invalidate("prompt.section")`
 on change), because every change spends the prompt cache. Events:
-`prompt.compose`. Overlap: none. Risk: model; cache cost. Grounding: admit for
+`prompt.compose`. Overlap: none found. Risk: model; cache cost. Grounding: admit for
 the hook; abstain on net value (the model can read STATE.md itself).
 
 **D3. Reminder trimming**
@@ -285,7 +289,7 @@ todo reminder nudging TodoWrite while GSD tracks tasks in PLAN.md). Events:
 A band button that asks `$.model.fork` one tool-less question over the live
 transcript ("which GSD workflow step is running and why, in two sentences")
 and shows the answer in a toast. Prompt-cached prefix keeps it cheap.
-Events: `$.model.fork`, `ui.render`. Overlap: none. Risk: api. Grounding:
+Events: `$.model.fork`, `ui.render`. Overlap: none found. Risk: api. Grounding:
 admit.
 
 **E2. Checkpoint pre-read**
