@@ -109,6 +109,7 @@ describe('register', () => {
 
     const row = await $.ui.mount({ plugin: 'gsd-whisper', surface: 'terminal', ...ROW('tu9', 'Read') })
     expect(await row.find({ type: 'Text', text: / BLOCKED / })).toBeDefined()
+    expect(await row.find({ key: 'gsd-badge-0' })).toBeDefined()
     expect(await row.find({ type: 'Text', text: /secret-read-guard/ })).toBeDefined()
     await row.unmount()
   })
@@ -183,5 +184,25 @@ describe('register', () => {
       await ui.unmount()
     }
     expect(said.filled).toEqual(['/gsd-pause-work', '/gsd-pause-work'])
+  })
+
+  test('a folded group leads with the block, not the advice beside it', async ($, on) => {
+    const { clock } = world(on)
+    on('classic.PostToolUse', () => ({ additionalContext: [PHASE] }))
+    on('classic.PreToolUse', () => ({ deny: 'PreToolUse:Read hook error: ' + SECRET }))
+
+    await $.tool.call({ tool: 'Read', file_path: '/work/.env', tool_use_id: 'g1' } as never)
+    await $.classic.PostToolUse(post('g2'))
+    await clock.settle()
+
+    const group = await $.ui.mount({
+      plugin: 'gsd-whisper',
+      surface: 'terminal',
+      component: 'ToolGroup',
+      props: { calls: [{ tool_use_id: 'g1', tool: 'Read' }, { tool_use_id: 'g2', tool: 'Write' }], isActive: false, isExpanded: false },
+    } as never)
+    expect(await group.find({ type: 'Text', text: / BLOCKED / })).toBeDefined()
+    expect(await group.find({ type: 'Text', text: /\+1 more/ })).toBeDefined()
+    await group.unmount()
   })
 })

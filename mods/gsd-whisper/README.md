@@ -6,18 +6,20 @@ workflow advice, `.planning` edit reminders, and guard denials (secret reads,
 worktree paths, catastrophic STATE/ROADMAP shrinks, commit format, agent
 isolation).
 
-Status: **v0.2.0 (UI), mechanism confirmed live** (Claude Code 2.1.291,
+Status: **v0.2.1 (UI), mechanism confirmed live** (Claude Code 2.1.291,
 gsd-core hooks installed through settings.json): the mod saw a gsd-core
 PostToolUse advisory and a PreToolUse deny in a real session. Plugin-install
 gsd-core is not yet checked. Results: `../../research/spike-results-gsd-whisper.md`.
 
 ## What you see
 
-- **A badge under the tool row** a gsd-core hook spoke about, in your theme's
-  colours: `GSD [ BLOCKED ] secret-read-guard: Secret read guard: Read would
+- **A card under the tool row** a gsd-core hook spoke about: a rounded border
+  in the message's colour on the same subtle background Claude Code gives your
+  own prompt rows (the theme's `userMessageBackground`), so it reads in any
+  theme. The most severe message leads: `GSD [ BLOCKED ] secret-read-guard: Secret read guard: Read would
   read '.../spike/.env' ...` or `GSD [ ADVISED ] phase-boundary: .planning edit
   (...)`. Reads and searches that fold into one group line get one badge on
-  the group.
+  the group, led by a block if there is one.
 - **A toast** for a message tied to no tool call (session start, Stop), at
   most once a minute per message, and at gsd-core's context WARNING and
   CRITICAL thresholds.

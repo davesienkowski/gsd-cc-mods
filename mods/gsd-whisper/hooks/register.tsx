@@ -142,6 +142,16 @@ function colorOf(kind: WhisperKind): string {
   return kind === 'block' ? 'error' : kind === 'ask' ? 'warning' : 'suggestion'
 }
 
+// The card look: a rounded border in the message's colour on the same subtle
+// background Claude Code draws the person's own prompt rows on, so a card stands
+// apart from tool output in any theme (`userMessageBackground` is a key of the
+// person's theme, not a fixed colour).
+const CARD_BG = 'userMessageBackground'
+
+function severity(kind: WhisperKind): number {
+  return kind === 'block' ? 3 : kind === 'ask' ? 2 : 1
+}
+
 function ago(now: number, at: number): string {
   const s = Math.max(0, Math.round((now - at) / 1000))
   if (s < 60) return `${s}s`
@@ -226,27 +236,34 @@ export const register: Register = on => {
     if (list.length === 0) return next(e)
     const own = await next(e)
     const { Box, Text } = $.ui.resolve(e)
+    const shown = [...list].sort((a, b) => severity(b.kind) - severity(a.kind)).slice(0, 2)
+    const top = shown[0]!
     return (
       <Box flexDirection="column">
         {own}
-        {list.slice(-2).map((w, i) => (
-          <Box key={`gsd-badge-${i}`} paddingLeft={2}>
-            <Text color="claude" bold>
-              GSD{' '}
-            </Text>
-            <Text color={colorOf(w.kind)} inverse>
-              {` ${labelOf(w.kind)} `}
-            </Text>
-            <Text color="subtle" wrap="truncate-end">
-              {` ${w.rule}: ${w.summary}`}
-            </Text>
-          </Box>
-        ))}
-        {list.length > 2 && (
-          <Box paddingLeft={2}>
-            <Text color="subtle">{`  +${list.length - 2} more in /gsd-whisper`}</Text>
-          </Box>
-        )}
+        <Box
+          key="gsd-badge-0"
+          flexDirection="column"
+          marginLeft={2}
+          paddingX={1}
+          borderStyle="round"
+          borderColor={colorOf(top.kind)}
+          backgroundColor={CARD_BG}
+        >
+          {shown.map((w, i) => (
+            <Box key={`gsd-line-${i}`}>
+              <Text color="claude" bold>
+                GSD{' '}
+              </Text>
+              <Text color={colorOf(w.kind)} inverse>
+                {` ${labelOf(w.kind)} `}
+              </Text>
+              <Text bold>{` ${w.rule}`}</Text>
+              <Text wrap="truncate-end">{`  ${w.summary}`}</Text>
+            </Box>
+          ))}
+          {list.length > 2 && <Text color="subtle">{`+${list.length - 2} more in /gsd-whisper`}</Text>}
+        </Box>
       </Box>
     )
   })
@@ -263,19 +280,28 @@ export const register: Register = on => {
     if (found.length === 0) return next(e)
     const own = await next(e)
     const { Box, Text } = $.ui.resolve(e)
-    const last = found[found.length - 1]!
+    // Lead with the most severe: a block matters more than advice beside it.
+    const top = [...found].sort((a, b) => severity(b.kind) - severity(a.kind))[0]!
     return (
       <Box flexDirection="column">
         {own}
-        <Box key="gsd-badge-group" paddingLeft={2}>
+        <Box
+          key="gsd-badge-group"
+          marginLeft={2}
+          paddingX={1}
+          borderStyle="round"
+          borderColor={colorOf(top.kind)}
+          backgroundColor={CARD_BG}
+        >
           <Text color="claude" bold>
             GSD{' '}
           </Text>
-          <Text color={colorOf(last.kind)} inverse>
-            {` ${labelOf(last.kind)} `}
+          <Text color={colorOf(top.kind)} inverse>
+            {` ${labelOf(top.kind)} `}
           </Text>
-          <Text color="subtle" wrap="truncate-end">
-            {` ${last.rule}: ${last.summary}${found.length > 1 ? ` (+${found.length - 1} more)` : ''}`}
+          <Text bold>{` ${top.rule}`}</Text>
+          <Text wrap="truncate-end">
+            {`  ${top.summary}${found.length > 1 ? `  (+${found.length - 1} more in /gsd-whisper)` : ''}`}
           </Text>
         </Box>
       </Box>
@@ -287,7 +313,7 @@ export const register: Register = on => {
     const { Box, Button, Text } = $.ui.resolve(e)
     const list = await read($, whispers)
     const now = await $.clock.now()
-    const room = Math.max(3, (e.viewport?.rows ?? 24) - 6)
+    const room = Math.max(2, Math.floor(((e.viewport?.rows ?? 24) - 6) / 4))
     const counts = { block: 0, ask: 0, advice: 0 }
     for (const w of list) counts[w.kind] += 1
     return (
@@ -304,7 +330,14 @@ export const register: Register = on => {
           .slice(-room)
           .reverse()
           .map((w, i) => (
-            <Box key={`row-${i}`} flexDirection="column">
+            <Box
+              key={`row-${i}`}
+              flexDirection="column"
+              paddingX={1}
+              borderStyle="round"
+              borderColor={colorOf(w.kind)}
+              backgroundColor={CARD_BG}
+            >
               <Box>
                 <Text color={colorOf(w.kind)} inverse>
                   {` ${labelOf(w.kind)} `}

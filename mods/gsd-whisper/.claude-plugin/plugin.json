@@ -1,6 +1,6 @@
 {
   "name": "gsd-whisper",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Shows you what gsd-core's hooks quietly tell the agent: context warnings, guard advice and guard denials.",
   "types": "./types/index.d.ts"
 }
