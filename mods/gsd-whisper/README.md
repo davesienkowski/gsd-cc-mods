@@ -6,7 +6,7 @@ workflow advice, `.planning` edit reminders, and guard denials (secret reads,
 worktree paths, catastrophic STATE/ROADMAP shrinks, commit format, agent
 isolation).
 
-Status: **v0.2.1 (UI), mechanism confirmed live** (Claude Code 2.1.291,
+Status: **v0.2.2 (UI), mechanism confirmed live** (Claude Code 2.1.291,
 gsd-core hooks installed through settings.json): the mod saw a gsd-core
 PostToolUse advisory and a PreToolUse deny in a real session. Plugin-install
 gsd-core is not yet checked. Results: `../../research/spike-results-gsd-whisper.md`.
@@ -26,7 +26,9 @@ gsd-core is not yet checked. Results: `../../research/spike-results-gsd-whisper.
 - **At CRITICAL, a band above the prompt** with **Pause work** (fills
   `/gsd-pause-work` into the prompt; you press Enter) and **Dismiss**.
 - **`/gsd-whisper`** opens a pane: counts (blocked / asked / advised) and the
-  session's history, newest first, with a Clear button. Where no pane can be
+  session's history, newest first, with a Clear button (hotkey `c` once the
+  pane has the keys: ctrl+x then tab; clicks reach it only in the fullscreen
+  terminal). `/gsd-whisper clear` clears it from anywhere. Where no pane can be
   placed it answers with the same history as text.
 
 ## What it never does

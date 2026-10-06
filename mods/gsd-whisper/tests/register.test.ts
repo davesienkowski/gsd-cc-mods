@@ -161,6 +161,18 @@ describe('register', () => {
     expect(await pane.find({ type: 'Text', text: /1 advised/ })).toBeDefined()
     expect(await pane.find({ type: 'Text', text: /phase-boundary/ })).toBeDefined()
     await pane.unmount()
+
+    const cleared = await $.command.run({ command: 'gsd-whisper', args: 'clear', origin: { kind: 'composer' } } as never)
+    expect(cleared.text).toBe('Cleared the GSD whispers history.')
+    const empty = await $.ui.mount({
+      plugin: 'gsd-whisper',
+      surface: 'terminal',
+      component: 'Pane',
+      requestId: 'gsd-whisper',
+      props: { title: 'GSD whispers', isFocused: false, bodyColumns: 60, placement: 'dock', scroll: { offset: 0, bodyRows: 20 } },
+    } as never)
+    expect(await empty.find({ type: 'Text', text: /Nothing yet/ })).toBeDefined()
+    await empty.unmount()
   })
 
   test('at CRITICAL the band offers Pause, which fills and does not send', async ($, on) => {

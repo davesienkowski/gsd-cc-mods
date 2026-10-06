@@ -148,6 +148,35 @@ function colorOf(kind: WhisperKind): string {
 // person's theme, not a fixed colour).
 const CARD_BG = 'userMessageBackground'
 
+// The surface's Box and Text, as `$.ui.resolve(e)` hands them to a render hook.
+// Typed loosely here: every surface's table has both, with the props used below.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Els = { Box: any; Text: any }
+
+// One message as two lines: label and rule, then the summary cut to the width.
+// Two lines because one row squeezed the rule name into a wrap.
+function cardLines({ Box, Text }: Els, w: Whisper, i: number, extra: string, withGsd: boolean) {
+  return (
+    <Box key={`gsd-line-${i}`} flexDirection="column">
+      <Box flexShrink={0}>
+        {withGsd && (
+          <Text color="claude" bold>
+            GSD{' '}
+          </Text>
+        )}
+        <Text color={colorOf(w.kind)} inverse>
+          {` ${labelOf(w.kind)} `}
+        </Text>
+        <Text bold>{` ${w.rule}`}</Text>
+        <Text color="subtle">{extra}</Text>
+      </Box>
+      <Box paddingLeft={2}>
+        <Text wrap="truncate-end">{w.summary}</Text>
+      </Box>
+    </Box>
+  )
+}
+
 function severity(kind: WhisperKind): number {
   return kind === 'block' ? 3 : kind === 'ask' ? 2 : 1
 }
@@ -187,6 +216,7 @@ export const register: Register = on => {
     await $.command.register({
       name: 'gsd-whisper',
       description: 'Open the pane of what gsd-core hooks told the agent this session',
+      argumentHint: '[clear]',
     })
     // Spike aid (v0.1): lets the agent read the same report, so a live session
     // can check what the mod saw. Read-only.
@@ -202,7 +232,11 @@ export const register: Register = on => {
     return { result: report(await read($, whispers), await read($, stats)) }
   })
 
-  on('command.run', { command: 'gsd-whisper' }, async $ => {
+  on('command.run', { command: 'gsd-whisper' }, async ($, e) => {
+    if (e.args.trim() === 'clear') {
+      await update($, whispers, () => [])
+      return { text: 'Cleared the GSD whispers history.' }
+    }
     const opened = await $.ui.open({ id: PANE, title: 'GSD whispers' })
     if (opened.isPlaced) return { text: 'Opened the GSD whispers pane.' }
     return { text: report(await read($, whispers), await read($, stats)) }
@@ -250,18 +284,7 @@ export const register: Register = on => {
           borderColor={colorOf(top.kind)}
           backgroundColor={CARD_BG}
         >
-          {shown.map((w, i) => (
-            <Box key={`gsd-line-${i}`}>
-              <Text color="claude" bold>
-                GSD{' '}
-              </Text>
-              <Text color={colorOf(w.kind)} inverse>
-                {` ${labelOf(w.kind)} `}
-              </Text>
-              <Text bold>{` ${w.rule}`}</Text>
-              <Text wrap="truncate-end">{`  ${w.summary}`}</Text>
-            </Box>
-          ))}
+          {shown.map((w, i) => cardLines({ Box, Text }, w, i, '', true))}
           {list.length > 2 && <Text color="subtle">{`+${list.length - 2} more in /gsd-whisper`}</Text>}
         </Box>
       </Box>
@@ -287,22 +310,20 @@ export const register: Register = on => {
         {own}
         <Box
           key="gsd-badge-group"
+          flexDirection="column"
           marginLeft={2}
           paddingX={1}
           borderStyle="round"
           borderColor={colorOf(top.kind)}
           backgroundColor={CARD_BG}
         >
-          <Text color="claude" bold>
-            GSD{' '}
-          </Text>
-          <Text color={colorOf(top.kind)} inverse>
-            {` ${labelOf(top.kind)} `}
-          </Text>
-          <Text bold>{` ${top.rule}`}</Text>
-          <Text wrap="truncate-end">
-            {`  ${top.summary}${found.length > 1 ? `  (+${found.length - 1} more in /gsd-whisper)` : ''}`}
-          </Text>
+          {cardLines(
+            { Box, Text },
+            top,
+            0,
+            found.length > 1 ? `  +${found.length - 1} more in /gsd-whisper` : '',
+            true,
+          )}
         </Box>
       </Box>
     )
@@ -338,20 +359,20 @@ export const register: Register = on => {
               borderColor={colorOf(w.kind)}
               backgroundColor={CARD_BG}
             >
-              <Box>
-                <Text color={colorOf(w.kind)} inverse>
-                  {` ${labelOf(w.kind)} `}
-                </Text>
-                <Text bold>{` ${w.rule}`}</Text>
-                <Text color="subtle">{`${w.tool ? ` ${w.tool}` : ''}${w.isSubagent ? ' (subagent)' : ''}  ${ago(now, w.at)} ago`}</Text>
-              </Box>
-              <Box paddingLeft={2}>
-                <Text wrap="truncate-end">{w.summary}</Text>
-              </Box>
+              {cardLines(
+                { Box, Text },
+                w,
+                0,
+                `${w.tool ? `  ${w.tool}` : ''}${w.isSubagent ? ' (subagent)' : ''}  ${ago(now, w.at)} ago`,
+                false,
+              )}
             </Box>
           ))}
         <Text> </Text>
-        <Button key="clear" label="Clear" onPress={() => update($, whispers, () => [])} />
+        <Box>
+          <Button key="clear" label="Clear" hotkey="c" onPress={() => update($, whispers, () => [])} />
+          <Text color="subtle">{'  or /gsd-whisper clear (keys reach the pane after ctrl+x, tab)'}</Text>
+        </Box>
       </Box>
     )
   })
