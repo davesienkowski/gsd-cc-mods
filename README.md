@@ -81,6 +81,11 @@ Where the pane appears is Claude Code's decision, not the mod's:
   prompt instead. Switch with `/tui fullscreen` (Claude Code saves the choice
   and relaunches with the conversation intact) or set `"tui": "fullscreen"`.
   This is the setting that gives the side pane in Orca's terminal.
+  Fullscreen keeps the conversation out of the terminal's scrollback (search
+  with ctrl+o then `/`) and takes the mouse (hold Shift for a native
+  selection). If you see stale fragments on screen under Windows (ConPTY
+  hosts), Claude Code's documented fix is `CLAUDE_CODE_ALT_SCREEN_FULL_REPAINT=1`
+  ([fullscreen docs](https://code.claude.com/docs/en/fullscreen)).
 - **Width.** A pane opened by a command (`/gsd`, `/gsd-whisper`, `/gsd-board`)
   docks from 110 columns. A pane opened on its own at session start needs 144
   columns, or 110 if you opened that pane by hand before and have not closed
